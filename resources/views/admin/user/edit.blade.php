@@ -1,5 +1,5 @@
 <x-edit-layout>
-    @section('title','Edit User')
+    @section('title', 'Edit User')
     <h1 class="heading"> Edit User</h1>
     <div class="underline mx-auto hr_line"></div>
     <div class="anchor_tag">
@@ -7,7 +7,7 @@
             <h5 class="go_back">←</h5>
         </a>
     </div>
-    <form action="{{ route('user.update', ['id' => $users->id]) }}" method="post">
+    <form action="{{ route('user.update', ['user' => $users->id]) }}" method="post"  class="mt-5 shadow p-3 ">
         @csrf
         @method('PUT')
         <label for="name">User name<span class="star">*</span></label>

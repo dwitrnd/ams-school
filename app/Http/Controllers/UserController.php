@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UserRequest;
 use App\Mail\UserCredentialMail;
 use App\Models\Role;
 use Illuminate\Http\Request;
@@ -26,23 +27,12 @@ class UserController extends Controller
         return view('admin.user.create')->with(compact('users', 'roles'));
     }
 
-    public function store(Request $request)
+    public function store(UserRequest $request)
     {
-        $request->validate([
-            'name' => [
-                'required',
-                'regex:/^[A-Za-z\s]+$/',
-                'max:255',
-                Rule::unique('users', 'name'),
-            ],
-            'email' => 'required|email|unique:users',
-            'role' => 'required',
-        ]);
-
-        $user = new User;
-        $user->name = trim($request->input('name'));
-        $user->email = trim($request->input('email'));
-        $user->password = bcrypt('password2@23');
+        try{
+        $data=$request->validated();
+        $data['password'] = bcrypt($request->input('password'));
+        $user = User::create($data);
         $user->save();
         $roles = $request->input('role');
         $user->roles()->sync($roles);
@@ -50,6 +40,9 @@ class UserController extends Controller
         Mail::to($user->email)->send(new UserCredentialMail($user, [Role::select('role')->where('id', $request->role)->first()->role]));
 
         return redirect(route('user.index'))->with('success', 'User Successfully Created');
+        }catch(\Exception $e){
+            return redirect(route('user.create'))->with('error', 'User Not Created');
+        }
     }
 
     public function edit($id)
@@ -61,6 +54,7 @@ class UserController extends Controller
 
     public function update(Request $request, $id)
     {
+        try{
         $users = User::find($id);
         $request->validate([
             'name' => 'required',
@@ -74,9 +68,12 @@ class UserController extends Controller
         $users->roles()->sync($roles);
 
         return redirect(route('user.index'))->with('success', 'User Successfully Updated');
+        }catch(\Exception $e){
+            return redirect(route('user.create'))->with('error', 'User Not Updated');
+        }
     }
 
-    public function delete($id)
+    public function destroy($id)
     {
         $users = User::find($id);
         $users->roles()->detach();
