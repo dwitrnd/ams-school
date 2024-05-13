@@ -27,8 +27,17 @@
                         <td>{{ $student->name }}</td>
                         <td>{{ $student->roll_no }}</td>
                         <td>{{ $student->email }}</td>
+                        @if($student->section)
                         <td>{{ $student->section->grade->name }}-{{ $student->section->name }}</td>
-                        <td>{{ $student->status }}</td>
+                        @else
+                        <td>N/A</td>
+                        @endif
+                        @if($student->status == 'active')
+                        <td class="text-success fw-bolder">Active</td>
+                        @elseif($student->status =='dropped_out')
+                        <td class="text-danger fw-bold">Dropped Out</td>
+                        @endif
+                        {{-- <td>{{ $student->status }}</td> --}}
                         <td class="">
                             <a href="{{ route('student.edit', ['id' => $student->id]) }}" class="btn btn-success">Edit</a>
                             <a href="{{ route('student.delete', ['id' => $student->id]) }}" class="btn btn-danger">Delete</a>

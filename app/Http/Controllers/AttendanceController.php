@@ -21,47 +21,75 @@ class AttendanceController extends Controller
     /**
      * Display a listing of the resource.
      */
+ 
     public function index()
     {
         $attendances = Attendance::where('date', date('Y-m-d'))
-            ->get()
-            ->groupBy('teacher_id');
+        ->get()
+        ->groupBy('teacher_id');
 
-        $users = User::with('section')->whereIn('id', $attendances->keys())->get();
+    $userIds = $attendances->keys();
 
+    $users = User::with(['section.grade'])
+        ->whereIn('id', $userIds)
+        ->get();
+
+        $users = $users->sortBy(function ($user) {
+            if ($user->section && $user->section->grade) {
+                return $user->section->grade->name;
+            } else {
+                return null;
+            }
+        });
         return view('admin.attendance.index', compact('users'));
     }
+
 
     /**
      * Show the form for creating a new resource.
      */
     public function create()
-    {
-        $attendanceDates = Attendance::where('teacher_id', Auth::user()->id)
-            ->where('created_at', '>', Carbon::now()->subDays(6))
-            ->get()
-            ->groupBy(function ($query) {
-                return Carbon::parse($query->created_at)->format('M/d');
-            })
-            ->take(5);
+{
+    $attendanceDates = Attendance::where('teacher_id', Auth::user()->id)
+        ->where('created_at', '>', Carbon::now()->subDays(6))
+        ->get()
+        ->groupBy(function ($query) {
+            return Carbon::parse($query->created_at)->format('M/d');
+        })
+        ->take(5);
 
-        return view('teacher.attendance.index', compact("attendanceDates"));
-    }
+    $students = Student::where('status', 'active')->get();
+    $attendanceDates = $attendanceDates->filter(function ($date) use ($students) {
+        return $students->contains('id', $date->first()->student_id);
+    });
+    return view('teacher.attendance.index', compact("attendanceDates"));
+}
+
 
     /**
      * Store a newly created resource in storage.
      */
     public function store(AttendanceRequest $request)
     {
+        
         $input = $request->validated();
+        
         try {
             DB::beginTransaction();
-
+            $user = Auth::user();
             foreach ($input['attendances'] as $attendanceAndRoll) {
                 $student = Student::where('roll_no', $attendanceAndRoll['rollNo'])->first();
                 $attendance = new Attendance();
                 $attendance->student_id = $student->id;
-                $attendance->teacher_id = $request->teacher ?? Auth::user()->id;
+                // if ($user->id == 1) {
+                //     $section = $student->section;
+                //     $teacher = $section->user;
+                //     $attendance->teacher_id = $teacher->id;
+                // }
+                // else{
+                //     $attendance->teacher_id =Auth::user()->id;
+                // }
+                $attendance->teacher_id =$student->section->user->id??Auth::user()->id;
                 $attendance->present = $attendanceAndRoll['attendanceStatus']['present'];
                 $attendance->absent = $attendanceAndRoll['attendanceStatus']['absent'];
                 // Handle comments for absent students
@@ -72,9 +100,12 @@ class AttendanceController extends Controller
                 $attendance->date = date('Y-m-d');
                 $attendance->save();
             }
+            
             DB::commit();
+            
             return response()->json(['msg' => 'Attendance Has Been Taken Successfully!', 200]);
         } catch (Exception $e) {
+            dd($e);
             DB::rollBack();
             Log::error('Error occurred while uploading attendance.' .  $e);
             return response()->json(['msg' => 'Oops! Error Occured. Please Try Again Later.', 400]);
@@ -112,7 +143,10 @@ class AttendanceController extends Controller
         try {
             DB::beginTransaction();
             foreach ($input['attendances'] as $attendanceAndRoll) {
-                $student = Student::where('roll_no', $attendanceAndRoll['rollNo'])->first();
+                $student = Student::where('roll_no', $attendanceAndRoll['rollNo'])
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->first();
                 $attendance = Attendance::where('teacher_id', $user->id)
                     ->where('student_id', $student->id)
                     ->where('date', date('Y-m-d'))
@@ -151,7 +185,9 @@ class AttendanceController extends Controller
         $sections = Section::with('grade')->get();
         if ($request->has('section')) {
 
-            $students = Student::where('section_id', $request->section)->get();
+            $students = Student::where('section_id', $request->section)
+            ->where('status', 'active')
+                ->orderBy('roll_no')->get();
             $checkIfTodayAttendanceExists =  Attendance::whereHas('student', function ($query) use ($request) {
                 return $query->where('students.section_id', $request->section);
             })

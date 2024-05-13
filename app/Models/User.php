@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -61,6 +62,8 @@ class User extends Authenticatable
         return $this->hasManyThrough(Student::class, Section::class);
     }
 
+
+
     /**
      * Defines one-to-many relationship between teachers and attendance
      *
@@ -70,6 +73,8 @@ class User extends Authenticatable
     {
         return $this->hasMany(Attendance::class, 'teacher_id', 'id');
     }
+
+
 
     /**
      * Check if user has a given role
@@ -94,22 +99,26 @@ class User extends Authenticatable
      * @param integer $limit
      * @param date $startDate
      * @param date $endDate
-     * 
+     *
      * @return mixed
      */
-    public function getAllAttendanceDates($startDate, $endDate, $limit=50)
+    public function getAllAttendanceDates($startDate, $endDate, $limit = 50)
     {
-        $startDate = $startDate ?? Auth::user()->section->grade->start_date;
-        $endDate = $endDate ?? date('Y-m-d');
+        try {
+            $startDate = $startDate ?? Auth::user()->section->grade->start_date;
+            $endDate = $endDate ?? date('Y-m-d');
 
-        $attendance = $this->attendances
-                            ->whereBetween('date', [$startDate, $endDate])
-                            ->groupBy(function ($query) {
-                                return Carbon::parse($query->date)->format('m/d');
-                            })
-                            ->take($limit);
+            $attendance = $this->attendances
+                ->whereBetween('date', [$startDate, $endDate])
+                ->groupBy(function ($query) {
+                    return Carbon::parse($query->date)->format('m/d');
+                })
+                ->take($limit);
 
-        return $attendance->keys();
+            return $attendance->keys();
+        } catch (Exception $e) {
+            return redirect()->back();
+        }
     }
 
     /**
